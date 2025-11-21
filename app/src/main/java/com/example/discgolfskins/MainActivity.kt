@@ -99,7 +99,29 @@ fun DiscGolfSkinsApp() {
                     gameState = gameState.copy(holes = holes)
                 },
                 onNextHole = {
+                    // Ensure all players have scores for current hole (default to 3)
+                    val currentHoleIndex = gameState.currentHole - 1
+                    val holes = gameState.holes.toMutableList()
+                    
+                    // Ensure we have enough holes
+                    while (holes.size <= currentHoleIndex) {
+                        holes.add(Hole(holes.size + 1))
+                    }
+                    
+                    val currentHole = holes[currentHoleIndex]
+                    val updatedScores = currentHole.scores.toMutableMap()
+                    
+                    // Add default score (3) for any players not yet scored
+                    gameState.players.forEach { player ->
+                        if (!updatedScores.containsKey(player.id)) {
+                            updatedScores[player.id] = 3
+                        }
+                    }
+                    
+                    holes[currentHoleIndex] = currentHole.copy(scores = updatedScores)
+                    
                     gameState = gameState.copy(
+                        holes = holes,
                         currentHole = gameState.currentHole + 1,
                         viewingHole = null
                     )
@@ -254,8 +276,14 @@ fun ScoreEntryScreen(
     // Get players in rotated order for this hole
     val playersInOrder = gameState.getPlayersInOrder(viewingHoleNumber)
     
-    val allScoresEntered = playersInOrder.all { player ->
-        hole?.scores?.containsKey(player.id) == true
+    // For current hole: all scores are considered entered (default to 3)
+    // For past holes: need explicit scores
+    val allScoresEntered = if (isViewingPast) {
+        playersInOrder.all { player ->
+            hole?.scores?.containsKey(player.id) == true
+        }
+    } else {
+        true  // Current hole always shows "Next Hole" button
     }
     
     val skinsUpForGrabs = gameState.getCurrentSkinsValue()
@@ -351,7 +379,7 @@ fun ScoreEntryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Skins: ${gameState.getPlayerSkins(player.id)}",
+                                    text = "Skins: ${gameState.getPlayerSkinsCompleted(player.id)}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )

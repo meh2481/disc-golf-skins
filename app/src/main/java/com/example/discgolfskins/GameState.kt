@@ -59,8 +59,11 @@ data class GameState(
     
     fun getCurrentSkinsValue(): Int {
         // Calculate how many skins are up for grabs on current hole
+        // Only count COMPLETED holes (holes before current hole)
         var carriedOver = 0
-        holes.forEach { hole ->
+        val completedHoles = holes.take(currentHole - 1)
+        
+        completedHoles.forEach { hole ->
             val scores = hole.scores
             if (scores.isEmpty()) return@forEach
             
@@ -74,6 +77,34 @@ data class GameState(
             }
         }
         return 1 + carriedOver
+    }
+    
+    fun getPlayerSkinsCompleted(playerId: Int): Int {
+        // Only count skins from completed holes (not current hole being edited)
+        val results = mutableListOf<SkinResult>()
+        var carriedOver = 0
+        val completedHoles = holes.take(currentHole - 1)
+
+        completedHoles.forEach { hole ->
+            val scores = hole.scores
+            if (scores.isEmpty()) return@forEach
+
+            val minScore = scores.values.minOrNull() ?: return@forEach
+            val winners = scores.filter { it.value == minScore }
+
+            if (winners.size == 1) {
+                val winnerId = winners.keys.first()
+                results.add(SkinResult(hole.number, winnerId, 1 + carriedOver))
+                carriedOver = 0
+            } else {
+                results.add(SkinResult(hole.number, null, 1))
+                carriedOver++
+            }
+        }
+
+        return results
+            .filter { it.winnerId == playerId }
+            .sumOf { it.skinsValue }
     }
     
     fun getPlayersInOrder(holeNumber: Int): List<Player> {
