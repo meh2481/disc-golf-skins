@@ -193,4 +193,85 @@ class GameStateTest {
         assertEquals(1, gameState.getPlayerSkins(0))
         assertEquals(0, gameState.getPlayerSkins(1))
     }
+    
+    @Test
+    fun testPlayerOrderRotation() {
+        val players = listOf(
+            Player("Alice", 0),
+            Player("Bob", 1),
+            Player("Charlie", 2),
+            Player("Dave", 3)
+        )
+        val gameState = GameState(players = players)
+        
+        // Hole 1: Original order
+        val hole1Order = gameState.getPlayersInOrder(1)
+        assertEquals("Alice", hole1Order[0].name)
+        assertEquals("Bob", hole1Order[1].name)
+        assertEquals("Charlie", hole1Order[2].name)
+        assertEquals("Dave", hole1Order[3].name)
+        
+        // Hole 2: Rotated (last player moves to front)
+        val hole2Order = gameState.getPlayersInOrder(2)
+        assertEquals("Dave", hole2Order[0].name)
+        assertEquals("Alice", hole2Order[1].name)
+        assertEquals("Bob", hole2Order[2].name)
+        assertEquals("Charlie", hole2Order[3].name)
+        
+        // Hole 3: Rotated again
+        val hole3Order = gameState.getPlayersInOrder(3)
+        assertEquals("Charlie", hole3Order[0].name)
+        assertEquals("Dave", hole3Order[1].name)
+        assertEquals("Alice", hole3Order[2].name)
+        assertEquals("Bob", hole3Order[3].name)
+    }
+    
+    @Test
+    fun testGetCurrentSkinsValue() {
+        val players = listOf(
+            Player("Alice", 0),
+            Player("Bob", 1)
+        )
+        
+        // No holes played - should be 1 skin
+        val gameState1 = GameState(players = players, holes = emptyList())
+        assertEquals(1, gameState1.getCurrentSkinsValue())
+        
+        // One hole with tie - should be 2 skins up for grabs
+        val gameState2 = GameState(players = players, holes = listOf(
+            Hole(1, mapOf(0 to 3, 1 to 3))
+        ))
+        assertEquals(2, gameState2.getCurrentSkinsValue())
+        
+        // Two holes with ties - should be 3 skins up for grabs
+        val gameState3 = GameState(players = players, holes = listOf(
+            Hole(1, mapOf(0 to 3, 1 to 3)),
+            Hole(2, mapOf(0 to 4, 1 to 4))
+        ))
+        assertEquals(3, gameState3.getCurrentSkinsValue())
+        
+        // After a win - back to 1 skin
+        val gameState4 = GameState(players = players, holes = listOf(
+            Hole(1, mapOf(0 to 3, 1 to 3)),
+            Hole(2, mapOf(0 to 3, 1 to 4))
+        ))
+        assertEquals(1, gameState4.getCurrentSkinsValue())
+    }
+    
+    @Test
+    fun testGetTotalScore() {
+        val players = listOf(
+            Player("Alice", 0),
+            Player("Bob", 1)
+        )
+        val holes = listOf(
+            Hole(1, mapOf(0 to 3, 1 to 4)),
+            Hole(2, mapOf(0 to 4, 1 to 3)),
+            Hole(3, mapOf(0 to 5, 1 to 5))
+        )
+        val gameState = GameState(players = players, holes = holes)
+        
+        assertEquals(12, gameState.getTotalScore(0)) // Alice: 3+4+5
+        assertEquals(12, gameState.getTotalScore(1)) // Bob: 4+3+5
+    }
 }

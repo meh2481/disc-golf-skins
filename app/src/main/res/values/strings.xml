@@ -15,4 +15,11 @@
     <string name="carried_over">Carried Over</string>
     <string name="enter_score">Enter score</string>
     <string name="remove">Remove</string>
+    <string name="randomize_order">Randomize Order</string>
+    <string name="skins_up_for_grabs">Skins up for grabs: %1$d</string>
+    <string name="round_summary">Round Summary</string>
+    <string name="edit_hole">Edit Hole %1$d</string>
+    <string name="back_to_current">Back to Current Hole</string>
+    <string name="total_score">Total Score</string>
+    <string name="round_score">Round Score</string>
 </resources>
