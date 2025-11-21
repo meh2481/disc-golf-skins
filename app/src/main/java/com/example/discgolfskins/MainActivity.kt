@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -53,10 +54,11 @@ fun DiscGolfSkinsApp() {
                         players = gameState.players.filter { it.id != player.id }
                     )
                 },
-                onStartGame = {
-                    if (gameState.players.size >= 2) {
-                        gameState = gameState.copy(isGameStarted = true)
-                    }
+                onStartGame = { orderedPlayers ->
+                    gameState = gameState.copy(
+                        players = orderedPlayers,
+                        isGameStarted = true
+                    )
                 }
             )
         }
@@ -65,33 +67,51 @@ fun DiscGolfSkinsApp() {
                 gameState = gameState,
                 onNewGame = {
                     gameState = GameState()
+                },
+                onViewHole = { holeNumber ->
+                    gameState = gameState.copy(
+                        isGameFinished = false,
+                        viewingHole = holeNumber
+                    )
                 }
             )
         }
         else -> {
             ScoreEntryScreen(
                 gameState = gameState,
-                onScoreEntered = { playerId, score ->
-                    val currentHoleIndex = gameState.currentHole - 1
+                onScoreChanged = { playerId, delta ->
+                    val holeNumber = gameState.viewingHole ?: gameState.currentHole
+                    val holeIndex = holeNumber - 1
                     val holes = gameState.holes.toMutableList()
                     
                     // Ensure we have enough holes
-                    while (holes.size <= currentHoleIndex) {
+                    while (holes.size <= holeIndex) {
                         holes.add(Hole(holes.size + 1))
                     }
                     
-                    val currentHole = holes[currentHoleIndex]
-                    val updatedScores = currentHole.scores.toMutableMap()
-                    updatedScores[playerId] = score
-                    holes[currentHoleIndex] = currentHole.copy(scores = updatedScores)
+                    val hole = holes[holeIndex]
+                    val currentScore = hole.scores[playerId] ?: 3
+                    val newScore = (currentScore + delta).coerceAtLeast(1)
+                    val updatedScores = hole.scores.toMutableMap()
+                    updatedScores[playerId] = newScore
+                    holes[holeIndex] = hole.copy(scores = updatedScores)
                     
                     gameState = gameState.copy(holes = holes)
                 },
                 onNextHole = {
-                    gameState = gameState.copy(currentHole = gameState.currentHole + 1)
+                    gameState = gameState.copy(
+                        currentHole = gameState.currentHole + 1,
+                        viewingHole = null
+                    )
                 },
                 onFinishGame = {
-                    gameState = gameState.copy(isGameFinished = true)
+                    gameState = gameState.copy(isGameFinished = true, viewingHole = null)
+                },
+                onViewHole = { holeNumber ->
+                    gameState = gameState.copy(viewingHole = holeNumber)
+                },
+                onBackToCurrent = {
+                    gameState = gameState.copy(viewingHole = null)
                 }
             )
         }
@@ -104,9 +124,15 @@ fun PlayerSetupScreen(
     players: List<Player>,
     onAddPlayer: (String) -> Unit,
     onRemovePlayer: (Player) -> Unit,
-    onStartGame: () -> Unit
+    onStartGame: (List<Player>) -> Unit
 ) {
     var playerName by remember { mutableStateOf("") }
+    var currentPlayers by remember { mutableStateOf(players) }
+    
+    // Update when players change externally
+    LaunchedEffect(players) {
+        currentPlayers = players
+    }
 
     Column(
         modifier = Modifier
@@ -143,10 +169,24 @@ fun PlayerSetupScreen(
             Text(stringResource(R.string.add_player))
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Randomize button
+        if (currentPlayers.size >= 2) {
+            Button(
+                onClick = {
+                    currentPlayers = currentPlayers.shuffled()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.randomize_order))
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Players (${players.size})",
+            text = "Players (${currentPlayers.size})",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -156,7 +196,7 @@ fun PlayerSetupScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            items(players) { player ->
+            items(currentPlayers) { player ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -173,7 +213,10 @@ fun PlayerSetupScreen(
                             text = player.name,
                             style = MaterialTheme.typography.bodyLarge
                         )
-                        TextButton(onClick = { onRemovePlayer(player) }) {
+                        TextButton(onClick = { 
+                            onRemovePlayer(player)
+                            currentPlayers = currentPlayers.filter { it.id != player.id }
+                        }) {
                             Text(stringResource(R.string.remove))
                         }
                     }
@@ -184,9 +227,9 @@ fun PlayerSetupScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = onStartGame,
+            onClick = { onStartGame(currentPlayers) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = players.size >= 2
+            enabled = currentPlayers.size >= 2
         ) {
             Text(stringResource(R.string.start_game))
         }
@@ -197,77 +240,153 @@ fun PlayerSetupScreen(
 @Composable
 fun ScoreEntryScreen(
     gameState: GameState,
-    onScoreEntered: (Int, Int) -> Unit,
+    onScoreChanged: (Int, Int) -> Unit,
     onNextHole: () -> Unit,
-    onFinishGame: () -> Unit
+    onFinishGame: () -> Unit,
+    onViewHole: (Int) -> Unit,
+    onBackToCurrent: () -> Unit
 ) {
-    val currentHoleIndex = gameState.currentHole - 1
-    val currentHole = gameState.holes.getOrNull(currentHoleIndex)
-    val allScoresEntered = gameState.players.all { player ->
-        currentHole?.scores?.containsKey(player.id) == true
+    val viewingHoleNumber = gameState.viewingHole ?: gameState.currentHole
+    val isViewingPast = gameState.viewingHole != null
+    val holeIndex = viewingHoleNumber - 1
+    val hole = gameState.holes.getOrNull(holeIndex)
+    
+    // Get players in rotated order for this hole
+    val playersInOrder = gameState.getPlayersInOrder(viewingHoleNumber)
+    
+    val allScoresEntered = playersInOrder.all { player ->
+        hole?.scores?.containsKey(player.id) == true
     }
+    
+    val skinsUpForGrabs = gameState.getCurrentSkinsValue()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = stringResource(R.string.hole_number, gameState.currentHole),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+        // Hole navigation
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { 
+                    if (viewingHoleNumber > 1) {
+                        onViewHole(viewingHoleNumber - 1)
+                    }
+                },
+                enabled = viewingHoleNumber > 1
+            ) {
+                Text("←", fontSize = 24.sp)
+            }
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = stringResource(R.string.hole_number, viewingHoleNumber),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (!isViewingPast) {
+                    Text(
+                        text = stringResource(R.string.skins_up_for_grabs, skinsUpForGrabs),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            IconButton(
+                onClick = { 
+                    if (viewingHoleNumber < gameState.holes.size) {
+                        onViewHole(viewingHoleNumber + 1)
+                    }
+                },
+                enabled = viewingHoleNumber < gameState.holes.size
+            ) {
+                Text("→", fontSize = 24.sp)
+            }
+        }
+        
+        if (isViewingPast) {
+            Button(
+                onClick = onBackToCurrent,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Text(stringResource(R.string.back_to_current))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(
             modifier = Modifier.weight(1f)
         ) {
-            items(gameState.players) { player ->
-                val currentScore = currentHole?.scores?.get(player.id)
-                var scoreText by remember(gameState.currentHole) { 
-                    mutableStateOf(currentScore?.toString() ?: "") 
-                }
+            items(playersInOrder) { player ->
+                val currentScore = hole?.scores?.get(player.id) ?: 3
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(16.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = player.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Skins: ${gameState.getPlayerSkins(player.id)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = player.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Skins: ${gameState.getPlayerSkins(player.id)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Total: ${gameState.getTotalScore(player.id)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
 
-                        OutlinedTextField(
-                            value = scoreText,
-                            onValueChange = { newValue ->
-                                scoreText = newValue
-                                newValue.toIntOrNull()?.let { score ->
-                                    if (score > 0) {
-                                        onScoreEntered(player.id, score)
-                                    }
+                            // +/- buttons for score
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onScoreChanged(player.id, -1) },
+                                    enabled = currentScore > 1
+                                ) {
+                                    Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                                 }
-                            },
-                            label = { Text(stringResource(R.string.enter_score)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.width(100.dp),
-                            singleLine = true
-                        )
+                                
+                                Text(
+                                    text = currentScore.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.width(48.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                
+                                IconButton(
+                                    onClick = { onScoreChanged(player.id, 1) }
+                                ) {
+                                    Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -275,7 +394,7 @@ fun ScoreEntryScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (allScoresEntered) {
+        if (!isViewingPast && allScoresEntered) {
             Button(
                 onClick = onNextHole,
                 modifier = Modifier.fillMaxWidth()
@@ -292,13 +411,25 @@ fun ScoreEntryScreen(
                 Text(stringResource(R.string.finish_game))
             }
         }
+        
+        // Round summary button
+        if (!isViewingPast) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onFinishGame,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.round_summary))
+            }
+        }
     }
 }
 
 @Composable
 fun GameSummaryScreen(
     gameState: GameState,
-    onNewGame: () -> Unit
+    onNewGame: () -> Unit,
+    onViewHole: (Int) -> Unit
 ) {
     val skins = gameState.calculateSkins()
     val playerSkins = gameState.players.associate { 
@@ -339,10 +470,17 @@ fun GameSummaryScreen(
                                 .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = player.name,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Column {
+                                Text(
+                                    text = player.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "Score: ${gameState.getTotalScore(player.id)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                             Text(
                                 text = "${playerSkins[player.id] ?: 0}",
                                 style = MaterialTheme.typography.bodyLarge,
@@ -368,7 +506,8 @@ fun GameSummaryScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(vertical = 4.dp),
+                    onClick = { onViewHole(skinResult.holeNumber) }
                 ) {
                     Row(
                         modifier = Modifier
