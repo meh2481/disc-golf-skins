@@ -427,6 +427,7 @@ fun ScoreEntryScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameSummaryScreen(
     gameState: GameState,
