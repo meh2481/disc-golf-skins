@@ -46,8 +46,8 @@ data class GameState(
                 carriedOver = 0
             } else {
                 // Tie - carry over
+                results.add(SkinResult(hole.number, null, 1))
                 carriedOver++
-                results.add(SkinResult(hole.number, null, 1 + carriedOver - 1))
             }
         }
 
