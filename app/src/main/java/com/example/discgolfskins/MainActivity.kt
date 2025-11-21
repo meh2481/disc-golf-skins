@@ -405,15 +405,12 @@ fun ScoreEntryScreen(
             IconButton(
                 onClick = { 
                     val nextHole = viewingHoleNumber + 1
-                    if (nextHole == gameState.currentHole && !gameState.isGameFinished) {
+                    if (nextHole == gameState.currentHole) {
                         // Navigating to current hole - clear viewingHole
                         onBackToCurrent()
                     } else if (nextHole < gameState.holes.size) {
                         // Navigating to a past hole
                         onViewHole(nextHole)
-                    } else if (nextHole == gameState.currentHole && gameState.isGameFinished) {
-                        // If on last hole in finished game, go back to current view
-                        onBackToCurrent()
                     }
                 },
                 enabled = viewingHoleNumber < gameState.holes.size || 
