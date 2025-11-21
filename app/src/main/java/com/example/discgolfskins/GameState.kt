@@ -65,11 +65,10 @@ data class GameState(
             .sumOf { it.skinsValue }
     }
     
-    fun getUnclaimedSkins(): Int {
-        // Count skins that are carried over (tied) and not yet awarded
-        val skins = calculateSkins()
+    private fun countCarriedOverSkins(results: List<SkinResult>): Int {
+        // Count carried over skins from the results
         var carriedOver = 0
-        skins.forEach { result ->
+        results.forEach { result ->
             if (result.winnerId == null) {
                 carriedOver++
             } else {
@@ -79,23 +78,18 @@ data class GameState(
         return carriedOver
     }
     
+    fun getUnclaimedSkins(): Int {
+        // Count skins that are carried over (tied) and not yet awarded
+        val skins = calculateSkins()
+        return countCarriedOverSkins(skins)
+    }
+    
     fun getCurrentSkinsValue(): Int {
         // Calculate how many skins are up for grabs on current hole
         // Only count COMPLETED holes (holes before current hole)
         val completedHoles = holes.take(currentHole - 1)
         val results = calculateSkinsForHoles(completedHoles)
-        
-        // Count carried over skins
-        var carriedOver = 0
-        results.forEach { result ->
-            if (result.winnerId == null) {
-                carriedOver++
-            } else {
-                carriedOver = 0
-            }
-        }
-        
-        return 1 + carriedOver
+        return 1 + countCarriedOverSkins(results)
     }
     
     fun getPlayerSkinsCompleted(playerId: Int): Int {

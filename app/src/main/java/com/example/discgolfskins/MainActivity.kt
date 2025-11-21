@@ -216,6 +216,22 @@ fun PlayerSetupScreen(
     LaunchedEffect(players) {
         currentPlayers = players
     }
+    
+    // Helper function to capitalize and add player
+    fun addPlayerWithCapitalization() {
+        if (playerName.isNotBlank()) {
+            val capitalizedName = playerName.trim()
+                .split(" ")
+                .joinToString(" ") { word ->
+                    word.replaceFirstChar { 
+                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) 
+                        else it.toString() 
+                    }
+                }
+            onAddPlayer(capitalizedName)
+            playerName = ""
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -241,40 +257,14 @@ fun PlayerSetupScreen(
                 imeAction = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(
-                onDone = {
-                    if (playerName.isNotBlank()) {
-                        val capitalizedName = playerName.trim()
-                            .split(" ")
-                            .joinToString(" ") { word ->
-                                word.replaceFirstChar { 
-                                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) 
-                                    else it.toString() 
-                                }
-                            }
-                        onAddPlayer(capitalizedName)
-                        playerName = ""
-                    }
-                }
+                onDone = { addPlayerWithCapitalization() }
             )
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = {
-                if (playerName.isNotBlank()) {
-                    val capitalizedName = playerName.trim()
-                        .split(" ")
-                        .joinToString(" ") { word ->
-                            word.replaceFirstChar { 
-                                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) 
-                                else it.toString() 
-                            }
-                        }
-                    onAddPlayer(capitalizedName)
-                    playerName = ""
-                }
-            },
+            onClick = { addPlayerWithCapitalization() },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(stringResource(R.string.add_player))
