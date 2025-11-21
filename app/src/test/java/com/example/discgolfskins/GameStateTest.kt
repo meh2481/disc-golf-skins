@@ -313,4 +313,58 @@ class GameStateTest {
         assertEquals(12, gameState.getTotalScore(0)) // Alice: 3+4+5
         assertEquals(12, gameState.getTotalScore(1)) // Bob: 4+3+5
     }
+    
+    @Test
+    fun testGetUnclaimedSkins() {
+        val players = listOf(
+            Player("Alice", 0),
+            Player("Bob", 1)
+        )
+        
+        // No unclaimed skins - Alice won
+        val gameState1 = GameState(
+            players = players,
+            holes = listOf(Hole(1, mapOf(0 to 3, 1 to 4)))
+        )
+        assertEquals(0, gameState1.getUnclaimedSkins())
+        
+        // 1 unclaimed skin - tie on last hole
+        val gameState2 = GameState(
+            players = players,
+            holes = listOf(
+                Hole(1, mapOf(0 to 3, 1 to 4)),  // Alice wins
+                Hole(2, mapOf(0 to 3, 1 to 3))   // Tie
+            )
+        )
+        assertEquals(1, gameState2.getUnclaimedSkins())
+        
+        // 3 unclaimed skins - multiple ties
+        val gameState3 = GameState(
+            players = players,
+            holes = listOf(
+                Hole(1, mapOf(0 to 3, 1 to 4)),  // Alice wins
+                Hole(2, mapOf(0 to 3, 1 to 3)),  // Tie
+                Hole(3, mapOf(0 to 4, 1 to 4)),  // Tie
+                Hole(4, mapOf(0 to 5, 1 to 5))   // Tie
+            )
+        )
+        assertEquals(3, gameState3.getUnclaimedSkins())
+    }
+    
+    @Test
+    fun testIsRoundComplete() {
+        val players = listOf(Player("Alice", 0), Player("Bob", 1))
+        
+        // Not complete - on hole 1
+        val gameState1 = GameState(players = players, currentHole = 1)
+        assertEquals(false, gameState1.isRoundComplete())
+        
+        // Not complete - on hole 18
+        val gameState2 = GameState(players = players, currentHole = 18)
+        assertEquals(false, gameState2.isRoundComplete())
+        
+        // Complete - on hole 19 (after finishing 18)
+        val gameState3 = GameState(players = players, currentHole = 19)
+        assertEquals(true, gameState3.isRoundComplete())
+    }
 }

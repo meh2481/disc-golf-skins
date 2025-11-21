@@ -25,6 +25,10 @@ data class GameState(
     val nextPlayerId: Int = 0,
     val viewingHole: Int? = null  // null means viewing current hole
 ) {
+    companion object {
+        const val MAX_HOLES = 18
+    }
+    
     private fun calculateSkinsForHoles(holesToProcess: List<Hole>): List<SkinResult> {
         val results = mutableListOf<SkinResult>()
         var carriedOver = 0
@@ -61,13 +65,8 @@ data class GameState(
             .sumOf { it.skinsValue }
     }
     
-    fun getCurrentSkinsValue(): Int {
-        // Calculate how many skins are up for grabs on current hole
-        // Only count COMPLETED holes (holes before current hole)
-        val completedHoles = holes.take(currentHole - 1)
-        val results = calculateSkinsForHoles(completedHoles)
-        
-        // Count carried over skins
+    private fun countCarriedOverSkins(results: List<SkinResult>): Int {
+        // Count carried over skins from the results
         var carriedOver = 0
         results.forEach { result ->
             if (result.winnerId == null) {
@@ -76,8 +75,21 @@ data class GameState(
                 carriedOver = 0
             }
         }
-        
-        return 1 + carriedOver
+        return carriedOver
+    }
+    
+    fun getUnclaimedSkins(): Int {
+        // Count skins that are carried over (tied) and not yet awarded
+        val skins = calculateSkins()
+        return countCarriedOverSkins(skins)
+    }
+    
+    fun getCurrentSkinsValue(): Int {
+        // Calculate how many skins are up for grabs on current hole
+        // Only count COMPLETED holes (holes before current hole)
+        val completedHoles = holes.take(currentHole - 1)
+        val results = calculateSkinsForHoles(completedHoles)
+        return 1 + countCarriedOverSkins(results)
     }
     
     fun getPlayerSkinsCompleted(playerId: Int): Int {
@@ -97,5 +109,9 @@ data class GameState(
     
     fun getTotalScore(playerId: Int): Int {
         return holes.sumOf { it.scores[playerId] ?: 0 }
+    }
+    
+    fun isRoundComplete(): Boolean {
+        return currentHole > MAX_HOLES
     }
 }
