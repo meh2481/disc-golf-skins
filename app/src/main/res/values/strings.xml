@@ -22,4 +22,10 @@
     <string name="back_to_current">Back to Current Hole</string>
     <string name="total_score">Total Score</string>
     <string name="round_score">Round Score</string>
+    <string name="unclaimed_skins">Unclaimed Skins for Playoff: %1$d</string>
+    <string name="playoff_needed">Playoff Needed</string>
+    <string name="confirm_quit">Confirm Quit</string>
+    <string name="quit_message">Are you sure you want to quit? Current scorecard will be lost.</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
 </resources>

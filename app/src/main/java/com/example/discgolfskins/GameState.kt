@@ -25,6 +25,10 @@ data class GameState(
     val nextPlayerId: Int = 0,
     val viewingHole: Int? = null  // null means viewing current hole
 ) {
+    companion object {
+        const val MAX_HOLES = 18
+    }
+    
     private fun calculateSkinsForHoles(holesToProcess: List<Hole>): List<SkinResult> {
         val results = mutableListOf<SkinResult>()
         var carriedOver = 0
@@ -59,6 +63,20 @@ data class GameState(
         return calculateSkins()
             .filter { it.winnerId == playerId }
             .sumOf { it.skinsValue }
+    }
+    
+    fun getUnclaimedSkins(): Int {
+        // Count skins that are carried over (tied) and not yet awarded
+        val skins = calculateSkins()
+        var carriedOver = 0
+        skins.forEach { result ->
+            if (result.winnerId == null) {
+                carriedOver++
+            } else {
+                carriedOver = 0
+            }
+        }
+        return carriedOver
     }
     
     fun getCurrentSkinsValue(): Int {
@@ -97,5 +115,9 @@ data class GameState(
     
     fun getTotalScore(playerId: Int): Int {
         return holes.sumOf { it.scores[playerId] ?: 0 }
+    }
+    
+    fun isRoundComplete(): Boolean {
+        return currentHole > MAX_HOLES
     }
 }

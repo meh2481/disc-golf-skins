@@ -2,10 +2,12 @@ package com.example.discgolfskins
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,10 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +42,52 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DiscGolfSkinsApp() {
     var gameState by remember { mutableStateOf(GameState()) }
+    var showQuitDialog by remember { mutableStateOf(false) }
+    
+    // Handle back button
+    BackHandler(enabled = gameState.isGameStarted) {
+        when {
+            gameState.isGameFinished -> {
+                // From summary, go back to last hole
+                val lastHoleWithScores = gameState.holes.size
+                if (lastHoleWithScores > 0) {
+                    gameState = gameState.copy(
+                        isGameFinished = false,
+                        viewingHole = lastHoleWithScores
+                    )
+                }
+            }
+            gameState.viewingHole != null -> {
+                // From viewing past hole, go back to current
+                gameState = gameState.copy(viewingHole = null)
+            }
+            else -> {
+                // From current hole, show quit confirmation
+                showQuitDialog = true
+            }
+        }
+    }
+    
+    if (showQuitDialog) {
+        AlertDialog(
+            onDismissRequest = { showQuitDialog = false },
+            title = { Text(stringResource(R.string.confirm_quit)) },
+            text = { Text(stringResource(R.string.quit_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showQuitDialog = false
+                    gameState = GameState()
+                }) {
+                    Text(stringResource(R.string.yes))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuitDialog = false }) {
+                    Text(stringResource(R.string.no))
+                }
+            }
+        )
+    }
 
     when {
         !gameState.isGameStarted -> {
@@ -120,11 +171,21 @@ fun DiscGolfSkinsApp() {
                     
                     holes[currentHoleIndex] = currentHole.copy(scores = updatedScores)
                     
-                    gameState = gameState.copy(
-                        holes = holes,
-                        currentHole = gameState.currentHole + 1,
-                        viewingHole = null
-                    )
+                    val nextHole = gameState.currentHole + 1
+                    // After hole 18, automatically finish the game
+                    if (nextHole > GameState.MAX_HOLES) {
+                        gameState = gameState.copy(
+                            holes = holes,
+                            isGameFinished = true,
+                            viewingHole = null
+                        )
+                    } else {
+                        gameState = gameState.copy(
+                            holes = holes,
+                            currentHole = nextHole,
+                            viewingHole = null
+                        )
+                    }
                 },
                 onFinishGame = {
                     gameState = gameState.copy(isGameFinished = true, viewingHole = null)
@@ -174,7 +235,27 @@ fun PlayerSetupScreen(
             onValueChange = { playerName = it },
             label = { Text(stringResource(R.string.player_name)) },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (playerName.isNotBlank()) {
+                        val capitalizedName = playerName.trim()
+                            .split(" ")
+                            .joinToString(" ") { word ->
+                                word.replaceFirstChar { 
+                                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) 
+                                    else it.toString() 
+                                }
+                            }
+                        onAddPlayer(capitalizedName)
+                        playerName = ""
+                    }
+                }
+            )
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -182,7 +263,15 @@ fun PlayerSetupScreen(
         Button(
             onClick = {
                 if (playerName.isNotBlank()) {
-                    onAddPlayer(playerName)
+                    val capitalizedName = playerName.trim()
+                        .split(" ")
+                        .joinToString(" ") { word ->
+                            word.replaceFirstChar { 
+                                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) 
+                                else it.toString() 
+                            }
+                        }
+                    onAddPlayer(capitalizedName)
                     playerName = ""
                 }
             },
@@ -328,11 +417,18 @@ fun ScoreEntryScreen(
             
             IconButton(
                 onClick = { 
-                    if (viewingHoleNumber < gameState.holes.size) {
-                        onViewHole(viewingHoleNumber + 1)
+                    // Allow navigating forward if hole exists OR if we're on the last completed hole and current hole is the next one
+                    val nextHole = viewingHoleNumber + 1
+                    if (nextHole < gameState.holes.size || 
+                        (nextHole == gameState.currentHole && !gameState.isGameFinished)) {
+                        onViewHole(nextHole)
+                    } else if (nextHole == gameState.currentHole && gameState.isGameFinished) {
+                        // If on last hole in finished game, go back to current view
+                        onBackToCurrent()
                     }
                 },
-                enabled = viewingHoleNumber < gameState.holes.size
+                enabled = viewingHoleNumber < gameState.holes.size || 
+                         (viewingHoleNumber + 1 == gameState.currentHole && !gameState.isGameFinished)
             ) {
                 Text("→", fontSize = 24.sp)
             }
@@ -465,6 +561,7 @@ fun GameSummaryScreen(
     val playerSkins = gameState.players.associate { 
         it.id to gameState.getPlayerSkins(it.id) 
     }
+    val unclaimedSkins = gameState.getUnclaimedSkins()
 
     Column(
         modifier = Modifier
@@ -519,6 +616,22 @@ fun GameSummaryScreen(
                             )
                         }
                     }
+                
+                // Show unclaimed skins if any
+                if (unclaimedSkins > 0) {
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        text = stringResource(R.string.unclaimed_skins, unclaimedSkins),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = stringResource(R.string.playoff_needed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
         }
 
