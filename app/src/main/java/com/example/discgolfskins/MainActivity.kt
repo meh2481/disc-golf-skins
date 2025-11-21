@@ -48,16 +48,13 @@ fun DiscGolfSkinsApp() {
     BackHandler(enabled = gameState.isGameStarted) {
         when {
             gameState.isGameFinished -> {
-                // From summary, go back to last hole
-                val lastHoleWithScores = gameState.holes.size
-                if (lastHoleWithScores > 0) {
-                    gameState = gameState.copy(
-                        isGameFinished = false,
-                        viewingHole = lastHoleWithScores
-                    )
-                }
+                // From summary, go back to current hole (not last completed hole)
+                gameState = gameState.copy(
+                    isGameFinished = false,
+                    viewingHole = null  // null means current hole
+                )
             }
-            gameState.viewingHole != null -> {
+            gameState.viewingHole != null && gameState.viewingHole != gameState.currentHole -> {
                 // From viewing past hole, go back to current
                 gameState = gameState.copy(viewingHole = null)
             }
@@ -348,7 +345,7 @@ fun ScoreEntryScreen(
     onBackToCurrent: () -> Unit
 ) {
     val viewingHoleNumber = gameState.viewingHole ?: gameState.currentHole
-    val isViewingPast = gameState.viewingHole != null
+    val isViewingPast = gameState.viewingHole != null && gameState.viewingHole != gameState.currentHole
     val holeIndex = viewingHoleNumber - 1
     val hole = gameState.holes.getOrNull(holeIndex)
     
@@ -407,14 +404,13 @@ fun ScoreEntryScreen(
             
             IconButton(
                 onClick = { 
-                    // Allow navigating forward if hole exists OR if we're on the last completed hole and current hole is the next one
                     val nextHole = viewingHoleNumber + 1
-                    if (nextHole < gameState.holes.size || 
-                        (nextHole == gameState.currentHole && !gameState.isGameFinished)) {
-                        onViewHole(nextHole)
-                    } else if (nextHole == gameState.currentHole && gameState.isGameFinished) {
-                        // If on last hole in finished game, go back to current view
+                    if (nextHole == gameState.currentHole) {
+                        // Navigating to current hole - clear viewingHole
                         onBackToCurrent()
+                    } else if (nextHole < gameState.holes.size) {
+                        // Navigating to a past hole
+                        onViewHole(nextHole)
                     }
                 },
                 enabled = viewingHoleNumber < gameState.holes.size || 
