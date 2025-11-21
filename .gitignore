@@ -79,3 +79,7 @@ lint-baseline.xml
 
 # Android Profiling
 *.hprof
+
+gradle/
+gradlew
+gradlew.bat
