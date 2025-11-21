@@ -313,7 +313,9 @@ fun ScoreEntryScreen(
         if (isViewingPast) {
             Button(
                 onClick = onBackToCurrent,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
             ) {
                 Text(stringResource(R.string.back_to_current))
             }
@@ -377,7 +379,7 @@ fun ScoreEntryScreen(
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.width(48.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    textAlign = TextAlign.Center
                                 )
                                 
                                 IconButton(

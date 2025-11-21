@@ -78,6 +78,7 @@ data class GameState(
     
     fun getPlayersInOrder(holeNumber: Int): List<Player> {
         // Rotate player order based on hole number
+        if (players.isEmpty()) return emptyList()
         val rotations = (holeNumber - 1) % players.size
         return players.takeLast(rotations) + players.dropLast(rotations)
     }
