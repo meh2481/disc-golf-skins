@@ -21,7 +21,8 @@ data class GameState(
     val holes: List<Hole> = emptyList(),
     val currentHole: Int = 1,
     val isGameStarted: Boolean = false,
-    val isGameFinished: Boolean = false
+    val isGameFinished: Boolean = false,
+    val nextPlayerId: Int = 0
 ) {
     fun calculateSkins(): List<SkinResult> {
         val results = mutableListOf<SkinResult>()

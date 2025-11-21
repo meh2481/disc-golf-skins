@@ -42,9 +42,10 @@ fun DiscGolfSkinsApp() {
             PlayerSetupScreen(
                 players = gameState.players,
                 onAddPlayer = { name ->
-                    val newPlayer = Player(name, gameState.players.size)
+                    val newPlayer = Player(name, gameState.nextPlayerId)
                     gameState = gameState.copy(
-                        players = gameState.players + newPlayer
+                        players = gameState.players + newPlayer,
+                        nextPlayerId = gameState.nextPlayerId + 1
                     )
                 },
                 onRemovePlayer = { player ->
