@@ -164,4 +164,33 @@ class GameStateTest {
         assertEquals(0, skins[0].winnerId)
         assertEquals(1, skins[0].skinsValue)
     }
+
+    @Test
+    fun testGameEndingWithTie() {
+        // Game ends with a tie - carried skins remain unawarded
+        val players = listOf(
+            Player("Alice", 0),
+            Player("Bob", 1)
+        )
+        val holes = listOf(
+            Hole(1, mapOf(0 to 3, 1 to 4)), // Alice wins
+            Hole(2, mapOf(0 to 3, 1 to 3))  // Tie - game ends
+        )
+        val gameState = GameState(players = players, holes = holes)
+        
+        val skins = gameState.calculateSkins()
+        assertEquals(2, skins.size)
+        
+        // Hole 1: Alice wins
+        assertEquals(0, skins[0].winnerId)
+        assertEquals(1, skins[0].skinsValue)
+        
+        // Hole 2: Tie
+        assertEquals(null, skins[1].winnerId)
+        assertEquals(1, skins[1].skinsValue)
+        
+        // Alice has 1 skin, Bob has 0 (the tied skin is not awarded)
+        assertEquals(1, gameState.getPlayerSkins(0))
+        assertEquals(0, gameState.getPlayerSkins(1))
+    }
 }
